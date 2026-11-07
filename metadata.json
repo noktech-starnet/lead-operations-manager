@@ -1,0 +1,8 @@
+{
+  "name": "Lead Operations Manager",
+  "description": "Sistema integral de depuración, normalización, clasificación por ciudad, deduplicación, exportación y control de entregas de leads de Meta Ads y fuentes externas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

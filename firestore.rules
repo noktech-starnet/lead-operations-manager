@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.]+$');
+    }
+
+    // Leads collection
+    match /leads/{leadId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(leadId);
+      allow delete: if false; // Soft-delete or archive only
+    }
+
+    // Clients Directory
+    match /clients/{clientId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidId(clientId);
+    }
+
+    // Distributions
+    match /distributions/{distributionId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(distributionId);
+      allow delete: if false;
+    }
+
+    // Weekly Reports (Immutable snapshots)
+    match /weeklyReports/{reportId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(reportId);
+      allow delete: if false;
+    }
+
+    // Reconciliations
+    match /reconciliations/{reconciliationId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(reconciliationId);
+      allow delete: if false;
+    }
+
+    // Processing Batches
+    match /processingBatches/{batchId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(batchId);
+      allow delete: if false;
+    }
+
+    // Deliveries
+    match /deliveries/{deliveryId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(deliveryId);
+      allow delete: if false;
+    }
+
+    // City Catalog & Aliases
+    match /cityAliases/{cityId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidId(cityId);
+    }
+
+    // Weekly Goals
+    match /weeklyGoals/{goalId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidId(goalId);
+    }
+
+    // Audit Logs
+    match /auditLogs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(logId);
+      allow update, delete: if false; // Append-only immutable logs
+    }
+  }
+}

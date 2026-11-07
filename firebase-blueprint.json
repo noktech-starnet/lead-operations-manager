@@ -1,0 +1,232 @@
+{
+  "entities": {
+    "Lead": {
+      "title": "Lead",
+      "description": "Identidad única consolidada de un lead tras depuración, normalización y deduplicación",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Identificador único basado en teléfono normalizado" },
+        "normalizedPhone": { "type": "string", "description": "Teléfono en formato estándar mexicano +52XXXXXXXXXX" },
+        "rawPhone": { "type": "string", "description": "Teléfono original leído de la fuente" },
+        "nombre": { "type": "string", "description": "Nombre normalizado con pila y apellido" },
+        "rawNombre": { "type": "string", "description": "Nombre original leído de la fuente" },
+        "ciudad": { "type": "string", "description": "Ciudad asignada de acuerdo al catálogo de alias" },
+        "rawAdset": { "type": "string", "description": "Nombre original del conjunto de anuncios" },
+        "campaign": { "type": "string", "description": "Campaña a la que pertenece el lead" },
+        "fechaAlta": { "type": "string", "description": "Fecha de alta operativa en formato DD/MM/YYYY" },
+        "status": {
+          "type": "string",
+          "enum": ["accepted", "rejected", "pending_review"],
+          "description": "Estado del lead en el flujo de depuración"
+        },
+        "reviewReason": { "type": "string", "description": "Código del motivo de validación, revisión o rechazo" },
+        "reviewDetail": { "type": "string", "description": "Explicación legible para el operador" },
+        "firstOccurrenceBatchId": { "type": "string", "description": "ID del primer lote en que apareció" },
+        "firstOccurrenceDate": { "type": "string", "description": "Fecha de la primera aparición" },
+        "exportedCount": { "type": "number", "description": "Veces que ha sido exportado" },
+        "deliveredCount": { "type": "number", "description": "Veces que ha sido entregado con acuse" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "status", "fechaAlta", "campaign"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Destinatario o cliente que recibe leads",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nombreComercial": { "type": "string" },
+        "campañas": { "type": "array" },
+        "contactoNombre": { "type": "string" },
+        "contactoEmail": { "type": "string" },
+        "contactoTelefono": { "type": "string" },
+        "estado": { "type": "string", "enum": ["activo", "inactivo"] },
+        "fechaAlta": { "type": "string" },
+        "observaciones": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "nombreComercial", "estado", "fechaAlta"]
+    },
+    "LeadDistribution": {
+      "title": "LeadDistribution",
+      "description": "Registro de movimiento y distribución de leads a clientes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fechaEnvio": { "type": "string" },
+        "clienteId": { "type": "string" },
+        "clienteNombre": { "type": "string" },
+        "campaña": { "type": "string" },
+        "ciudad": { "type": "string" },
+        "cantidad": { "type": "number" },
+        "responsable": { "type": "string" },
+        "archivoOrigen": { "type": "string" },
+        "deliveryId": { "type": "string" },
+        "tipoRegistro": { "type": "string", "enum": ["vinculado_archivo", "manual_sin_detalle"] },
+        "phones": { "type": "array" },
+        "observaciones": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "fechaEnvio", "clienteId", "campaña", "ciudad", "cantidad", "responsable"]
+    },
+    "WeeklyReport": {
+      "title": "WeeklyReport",
+      "description": "Reporte semanal consolidado o individual inmutable con conteos por fecha",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "numeroSemana": { "type": "number" },
+        "año": { "type": "number" },
+        "semanaOperativa": { "type": "string" },
+        "rangoFechas": { "type": "string" },
+        "tipoReporte": { "type": "string" },
+        "clienteId": { "type": "string" },
+        "clienteNombre": { "type": "string" },
+        "campaña": { "type": "string" },
+        "ciudad": { "type": "string" },
+        "filas": { "type": "array" },
+        "totalLeads": { "type": "number" },
+        "generadoPor": { "type": "string" },
+        "generadoEn": { "type": "string", "format": "date-time" },
+        "estado": { "type": "string", "enum": ["generado", "corregido"] }
+      },
+      "required": ["id", "numeroSemana", "año", "semanaOperativa", "totalLeads", "generadoPor"]
+    },
+    "ReconciliationResult": {
+      "title": "ReconciliationResult",
+      "description": "Resultado de conciliación de dump externo contra entregas confirmadas",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "semanaOperativa": { "type": "string" },
+        "proveedor": { "type": "string" },
+        "campaña": { "type": "string" },
+        "dumpFileName": { "type": "string" },
+        "totalEnviadosComparables": { "type": "number" },
+        "totalDumpValidos": { "type": "number" },
+        "coincidenciasCount": { "type": "number" },
+        "faltantesCount": { "type": "number" },
+        "noIdentificadosCount": { "type": "number" },
+        "duplicadosDumpCount": { "type": "number" },
+        "invalidosDumpCount": { "type": "number" },
+        "discrepanciasCount": { "type": "number" },
+        "tasaCoincidencia": { "type": "number" },
+        "fechaEjecucion": { "type": "string", "format": "date-time" },
+        "ejecutadoPor": { "type": "string" }
+      },
+      "required": ["id", "semanaOperativa", "proveedor", "totalEnviadosComparables", "coincidenciasCount"]
+    },
+    "ProcessingBatch": {
+      "title": "ProcessingBatch",
+      "description": "Lote de archivos importados y procesados",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "fechaAlta": { "type": "string" },
+        "campaign": { "type": "string" },
+        "sourceType": { "type": "string", "enum": ["meta_ads", "external_row2", "custom"] },
+        "fileNames": { "type": "array" },
+        "totalRowsRead": { "type": "number" },
+        "totalUniqueLeads": { "type": "number" },
+        "acceptedLeadsCount": { "type": "number" },
+        "pendingReviewCount": { "type": "number" },
+        "rejectedCount": { "type": "number" },
+        "duplicatesFound": { "type": "number" },
+        "cityConflictsFound": { "type": "number" },
+        "status": { "type": "string", "enum": ["completado", "en_proceso", "fallido"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "fechaAlta", "sourceType", "status"]
+    },
+    "Delivery": {
+      "title": "Delivery",
+      "description": "Registro de entrega de leads confirmada",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "batchId": { "type": "string" },
+        "ciudad": { "type": "string" },
+        "campaña": { "type": "string" },
+        "destinatario": { "type": "string" },
+        "clienteId": { "type": "string" },
+        "fechaEntrega": { "type": "string" },
+        "leadsCount": { "type": "number" },
+        "exportedLeadsCount": { "type": "number" },
+        "fileName": { "type": "string" },
+        "formato": { "type": "string", "enum": ["standard", "polaris", "vapi"] },
+        "semanaOperativa": { "type": "string" },
+        "observaciones": { "type": "string" },
+        "estado": { "type": "string", "enum": ["confirmada", "pendiente_acuse", "parcial"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ciudad", "destinatario", "fechaEntrega", "leadsCount", "estado"]
+    },
+    "CityAlias": {
+      "title": "CityAlias",
+      "description": "Definición de ciudad y alias para el motor de adset",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "canonicalCity": { "type": "string" },
+        "state": { "type": "string" },
+        "aliases": { "type": "array" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "canonicalCity", "aliases", "isActive"]
+    },
+    "WeeklyGoal": {
+      "title": "WeeklyGoal",
+      "description": "Meta semanal operativa por ciudad",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "semanaOperativa": { "type": "string" },
+        "ciudad": { "type": "string" },
+        "metaProcesamiento": { "type": "number" },
+        "metaEntrega": { "type": "number" }
+      },
+      "required": ["id", "semanaOperativa", "ciudad", "metaProcesamiento", "metaEntrega"]
+    }
+  },
+  "firestore": {
+    "/leads/{leadId}": {
+      "schema": "Lead",
+      "description": "Colección de leads únicos normalizados y clasificados"
+    },
+    "/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Directorio de clientes destinatarios de leads"
+    },
+    "/distributions/{distributionId}": {
+      "schema": "LeadDistribution",
+      "description": "Movimientos de distribución de leads por cliente y plaza"
+    },
+    "/weeklyReports/{reportId}": {
+      "schema": "WeeklyReport",
+      "description": "Histórico permanente de reportes semanales generados"
+    },
+    "/reconciliations/{reconciliationId}": {
+      "schema": "ReconciliationResult",
+      "description": "Historial de conciliaciones de dumps contra entregas"
+    },
+    "/processingBatches/{batchId}": {
+      "schema": "ProcessingBatch",
+      "description": "Colección de lotes de importación y procesamiento"
+    },
+    "/deliveries/{deliveryId}": {
+      "schema": "Delivery",
+      "description": "Colección de entregas confirmadas de leads"
+    },
+    "/cityAliases/{cityId}": {
+      "schema": "CityAlias",
+      "description": "Catálogo de ciudades y alias de adset"
+    },
+    "/weeklyGoals/{goalId}": {
+      "schema": "WeeklyGoal",
+      "description": "Metas semanales de procesamiento y entrega por ciudad"
+    }
+  }
+}
