@@ -1,3 +1,5 @@
+import { useAuth } from '../auth/AuthGate';
+import { canWrite } from '../../services/access';
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import {
@@ -37,6 +39,7 @@ export const WeeklyReportsView: React.FC<WeeklyReportsViewProps> = ({
   onRefresh,
   currentUserRole,
 }) => {
+  const canEdit = canWrite(useAuth().profile.roles, 'weeklyReports');
   const [activeTab, setActiveTab] = useState<'generador' | 'historico'>('generador');
 
   // Generator Filters
@@ -206,7 +209,7 @@ export const WeeklyReportsView: React.FC<WeeklyReportsViewProps> = ({
   };
 
   // Save to Immutable Report History
-  const handleSaveToHistory = () => {
+  const handleSaveToHistory = async () => {
     if (generatedRows.length === 0) {
       alert('No hay movimientos para generar este reporte.');
       return;
@@ -231,6 +234,7 @@ export const WeeklyReportsView: React.FC<WeeklyReportsViewProps> = ({
     };
 
     storageService.addWeeklyReport(newReport, 'Responsable Distribución');
+    try { await storageService.flush(); } catch { return; }
     setSavedSuccessMsg(`Reporte guardado en histórico inmutable con ID: ${reportId}`);
     setTimeout(() => setSavedSuccessMsg(null), 4000);
     onRefresh();
@@ -424,7 +428,7 @@ export const WeeklyReportsView: React.FC<WeeklyReportsViewProps> = ({
                 <button
                   type="button"
                   onClick={handleSaveToHistory}
-                  disabled={generatedRows.length === 0}
+                  disabled={!canEdit || generatedRows.length === 0}
                   className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5"
                 >
                   <Save className="w-3.5 h-3.5" />
@@ -651,6 +655,7 @@ export const WeeklyReportsView: React.FC<WeeklyReportsViewProps> = ({
                               <Download className="w-3.5 h-3.5" />
                             </button>
                             <button
+                              disabled={!canEdit}
                               onClick={() => {
                                 setCorrectionTargetReport(rep);
                                 setCorrectionReason('');

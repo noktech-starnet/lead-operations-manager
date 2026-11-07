@@ -86,7 +86,7 @@ export const ExportsView: React.FC<ExportsViewProps> = ({
   }, [selectedCity, campaign, fechaAlta, fileType]);
 
   // Handle Export Generation
-  const handleGenerateExports = () => {
+  const handleGenerateExports = async () => {
     if (exportableLeads.length === 0) return;
 
     const files = generateExportFiles(
@@ -99,8 +99,6 @@ export const ExportsView: React.FC<ExportsViewProps> = ({
       fileType
     );
 
-    setGeneratedFiles(files);
-    setExportedSuccess(true);
 
     // Update exportedCount on leads
     const nowIso = new Date().toISOString();
@@ -114,6 +112,9 @@ export const ExportsView: React.FC<ExportsViewProps> = ({
       }
     });
     storageService.saveLeads(allLeads);
+    try { await storageService.flush(); } catch { return; }
+    setGeneratedFiles(files);
+    setExportedSuccess(true);
   };
 
   // Download all generated files
@@ -125,7 +126,7 @@ export const ExportsView: React.FC<ExportsViewProps> = ({
   };
 
   // Register delivery
-  const handleConfirmDelivery = () => {
+  const handleConfirmDelivery = async () => {
     if (!generatedFiles || generatedFiles.length === 0) return;
 
     // Operational week
@@ -154,6 +155,7 @@ export const ExportsView: React.FC<ExportsViewProps> = ({
     };
 
     storageService.saveDelivery(delivery);
+    try { await storageService.flush(); } catch { return; }
     setShowDeliveryModal(false);
     if (onDeliveryCreated) onDeliveryCreated();
     alert(`¡Entrega de ${delivery.leadsCount} leads registrada exitosamente!`);

@@ -1,3 +1,5 @@
+import { useAuth } from '../auth/AuthGate';
+import { canWrite } from '../../services/access';
 import React, { useState, useMemo } from 'react';
 import {
   Truck,
@@ -31,6 +33,7 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
   cityCatalog,
   onRefresh,
 }) => {
+  const canEdit = canWrite(useAuth().profile.roles, 'deliveries');
   const [searchTerm, setSearchTerm] = useState('');
   const [cityFilter, setCityFilter] = useState('all');
   const [weekFilter, setWeekFilter] = useState('all');
@@ -184,7 +187,8 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
           </div>
 
           <button
-            onClick={handleOpenCreateModal}
+            disabled={!canEdit}
+          onClick={handleOpenCreateModal}
             className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-1.5 shrink-0"
           >
             <PlusCircle className="w-4 h-4" />

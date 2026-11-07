@@ -54,7 +54,7 @@ export const Modal: React.FC<ModalProps> = ({
 
       <div className="flex min-h-full items-center justify-center p-4 sm:p-6 text-center">
         <div
-          className={`w-full ${maxWidthClass} transform overflow-hidden rounded-2xl bg-slate-900 border border-slate-800 p-6 text-left shadow-2xl transition-all sm:my-8 text-slate-100 animate-in fade-in zoom-in-95 duration-150`}
+          className={`relative z-10 w-full ${maxWidthClass} transform overflow-hidden rounded-2xl bg-slate-900 border border-slate-800 p-6 text-left shadow-2xl transition-all sm:my-8 text-slate-100 animate-in fade-in zoom-in-95 duration-150`}
         >
           {/* Header */}
           <div className="flex items-start justify-between border-b border-slate-800/80 pb-4 mb-5">

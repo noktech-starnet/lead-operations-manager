@@ -1,3 +1,5 @@
+import { useAuth } from '../auth/AuthGate';
+import { canWrite } from '../../services/access';
 import React, { useState, useMemo } from 'react';
 import {
   Users,
@@ -36,6 +38,7 @@ export const ClientsDirectoryView: React.FC<ClientsDirectoryViewProps> = ({
   onRefresh,
   currentUserRole,
 }) => {
+  const canEdit = canWrite(useAuth().profile.roles, 'clients');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'activo' | 'inactivo'>('all');
   const [campaignFilter, setCampaignFilter] = useState('all');
@@ -177,6 +180,7 @@ export const ClientsDirectoryView: React.FC<ClientsDirectoryViewProps> = ({
         </div>
 
         <button
+          disabled={!canEdit}
           onClick={handleOpenCreate}
           className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-1.5 shrink-0"
         >
@@ -274,7 +278,8 @@ export const ClientsDirectoryView: React.FC<ClientsDirectoryViewProps> = ({
                   </span>
 
                   <button
-                    onClick={() => handleOpenEdit(client)}
+                    disabled={!canEdit}
+          onClick={() => handleOpenEdit(client)}
                     className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
                     title="Editar cliente"
                   >

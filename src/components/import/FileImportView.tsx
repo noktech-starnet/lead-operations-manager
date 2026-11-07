@@ -272,6 +272,7 @@ export const FileImportView: React.FC<FileImportViewProps> = ({
       };
 
       storageService.saveBatch(newBatch);
+      await storageService.flush();
       setLastBatchResult(newBatch);
 
       setProcessingProgress({ step: '¡Procesamiento completado con éxito!', percent: 100 });

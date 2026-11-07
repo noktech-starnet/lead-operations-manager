@@ -1,3 +1,4 @@
+import { cloudStore } from './cloudStore';
 import {
   Lead,
   ProcessingBatch,
@@ -47,10 +48,10 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const DEFAULT_USER_PROFILE: UserProfile = {
-  id: 'usr-admin-1',
-  nombre: 'Administrador de Operaciones',
-  email: 'operaciones@leadmanager.pro',
-  roles: ['admin', 'distribucion', 'conciliacion'],
+  id: '',
+  nombre: '',
+  email: '',
+  roles: [],
   currentActiveRole: 'admin',
 };
 
@@ -190,27 +191,67 @@ type ChangeListener = () => void;
 class StorageService {
   private listeners: Set<ChangeListener> = new Set();
 
-  constructor() {
-    this.initDefaults();
+  public async initialize(profile: UserProfile, workspace: string) {
+    await cloudStore.open(workspace);
+    const empty = !cloudStore.hasData();
+    this.saveUserProfile(profile);
+    if (empty && profile.roles.includes('admin')) {
+      this.initDefaults();
+      await cloudStore.flush();
+    }
+    this.notify();
+  }
+
+  public flush() { return cloudStore.flush(); }
+  public async refresh() {
+    const profile = this.getUserProfile();
+    await cloudStore.flush();
+    await cloudStore.reload();
+    this.saveUserProfile(profile);
+    this.notify();
+  }
+  public disconnect() { cloudStore.reset(); this.notify(); }
+  public async discardAndRefresh() {
+    const profile = this.getUserProfile();
+    await cloudStore.reload();
+    this.saveUserProfile(profile);
+    this.notify();
+  }
+  public hasLegacyData() {
+    return Object.values(STORAGE_KEYS).filter(key => key !== STORAGE_KEYS.USER_PROFILE).some(key => localStorage.getItem(key));
+  }
+  public async importLegacyData() {
+    const data: Record<string, unknown> = {};
+    for (const [key, collection] of Object.entries({
+      lom_leads_v1:'leads',lom_batches_v1:'batches',lom_deliveries_v1:'deliveries',lom_clients_v1:'clients',
+      lom_distributions_v1:'distributions',lom_weekly_reports_v1:'weeklyReports',lom_reconciliations_v1:'reconciliations',
+      lom_cities_v1:'cities',lom_goals_v1:'goals',lom_mappings_v1:'mappings',lom_settings_v1:'settings',lom_audit_v1:'auditLogs'
+    })) {
+      const raw = localStorage.getItem(key); if (raw) data[collection] = JSON.parse(raw);
+    }
+    const result = this.importAndVerifyDatabaseJson(JSON.stringify({data}), this.getUserProfile().email);
+    if (!result.success) throw new Error(result.message);
+    await this.flush();
+    // Keep the original browser copy until the administrator explicitly removes it.
   }
 
   private initDefaults() {
-    if (!localStorage.getItem(STORAGE_KEYS.CITY_CATALOG)) {
+    if (!cloudStore.getItem(STORAGE_KEYS.CITY_CATALOG)) {
       this.saveCities(DEFAULT_CITY_CATALOG);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.WEEKLY_GOALS)) {
+    if (!cloudStore.getItem(STORAGE_KEYS.WEEKLY_GOALS)) {
       this.saveGoals(INITIAL_GOALS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
+    if (!cloudStore.getItem(STORAGE_KEYS.SETTINGS)) {
       this.saveSettings(DEFAULT_SETTINGS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.CLIENTS)) {
+    if (!cloudStore.getItem(STORAGE_KEYS.CLIENTS)) {
       this.saveClients(DEFAULT_CLIENTS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.DISTRIBUTIONS)) {
+    if (!cloudStore.getItem(STORAGE_KEYS.DISTRIBUTIONS)) {
       this.saveDistributions(DEFAULT_DISTRIBUTIONS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.USER_PROFILE)) {
+    if (!cloudStore.getItem(STORAGE_KEYS.USER_PROFILE)) {
       this.saveUserProfile(DEFAULT_USER_PROFILE);
     }
   }
@@ -227,7 +268,7 @@ class StorageService {
   // --- User Profile & Active Role ---
   public getUserProfile(): UserProfile {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+      const data = cloudStore.getItem(STORAGE_KEYS.USER_PROFILE);
       return data ? JSON.parse(data) : DEFAULT_USER_PROFILE;
     } catch {
       return DEFAULT_USER_PROFILE;
@@ -235,12 +276,13 @@ class StorageService {
   }
 
   public saveUserProfile(profile: UserProfile) {
-    localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
+    cloudStore.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
     this.notify();
   }
 
   public setCurrentRole(role: UserRole) {
     const profile = this.getUserProfile();
+    if (!profile.roles.includes(role)) throw new Error('Rol no autorizado');
     profile.currentActiveRole = role;
     this.saveUserProfile(profile);
     this.addAuditLog('user', profile.id, 'CAMBIO_ROL_ACTIVO', `Rol activo cambiado a: ${role}`, profile.nombre);
@@ -249,7 +291,7 @@ class StorageService {
   // --- Leads ---
   public getLeads(): Lead[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.LEADS);
+      const data = cloudStore.getItem(STORAGE_KEYS.LEADS);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -267,7 +309,7 @@ class StorageService {
   }
 
   public saveLeads(leads: Lead[]) {
-    localStorage.setItem(STORAGE_KEYS.LEADS, JSON.stringify(leads));
+    cloudStore.setItem(STORAGE_KEYS.LEADS, JSON.stringify(leads));
     this.notify();
   }
 
@@ -282,7 +324,7 @@ class StorageService {
       newStatus: updatedLead.status,
       action,
       reason,
-      user,
+      user: this.getUserProfile().email,
     };
 
     updatedLead.reviewHistory = [historyEntry, ...(updatedLead.reviewHistory || [])];
@@ -337,7 +379,7 @@ class StorageService {
   // --- Batches ---
   public getBatches(): ProcessingBatch[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.BATCHES);
+      const data = cloudStore.getItem(STORAGE_KEYS.BATCHES);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -347,7 +389,7 @@ class StorageService {
   public saveBatch(batch: ProcessingBatch) {
     const batches = this.getBatches();
     batches.unshift(batch);
-    localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(batches));
+    cloudStore.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(batches));
     this.addAuditLog('batch', batch.id, 'CREACION_LOTE', `Lote "${batch.name}" creado con ${batch.totalRowsRead} registros`);
     this.notify();
   }
@@ -355,7 +397,7 @@ class StorageService {
   // --- Deliveries ---
   public getDeliveries(): Delivery[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.DELIVERIES);
+      const data = cloudStore.getItem(STORAGE_KEYS.DELIVERIES);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -365,7 +407,7 @@ class StorageService {
   public saveDelivery(delivery: Delivery) {
     const deliveries = this.getDeliveries();
     deliveries.unshift(delivery);
-    localStorage.setItem(STORAGE_KEYS.DELIVERIES, JSON.stringify(deliveries));
+    cloudStore.setItem(STORAGE_KEYS.DELIVERIES, JSON.stringify(deliveries));
 
     // Update deliveredCount on associated leads
     const leads = this.getLeads();
@@ -396,15 +438,15 @@ class StorageService {
   // --- Clients (Directorio de Clientes) ---
   public getClients(): Client[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.CLIENTS);
-      return data ? JSON.parse(data) : DEFAULT_CLIENTS;
+      const data = cloudStore.getItem(STORAGE_KEYS.CLIENTS);
+      return data ? JSON.parse(data) : [];
     } catch {
-      return DEFAULT_CLIENTS;
+      return [];
     }
   }
 
   public saveClients(clients: Client[]) {
-    localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
+    cloudStore.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
     this.notify();
   }
 
@@ -430,15 +472,15 @@ class StorageService {
   // --- Lead Distributions (Distribución de leads) ---
   public getDistributions(): LeadDistribution[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.DISTRIBUTIONS);
-      return data ? JSON.parse(data) : DEFAULT_DISTRIBUTIONS;
+      const data = cloudStore.getItem(STORAGE_KEYS.DISTRIBUTIONS);
+      return data ? JSON.parse(data) : [];
     } catch {
-      return DEFAULT_DISTRIBUTIONS;
+      return [];
     }
   }
 
   public saveDistributions(dists: LeadDistribution[]) {
-    localStorage.setItem(STORAGE_KEYS.DISTRIBUTIONS, JSON.stringify(dists));
+    cloudStore.setItem(STORAGE_KEYS.DISTRIBUTIONS, JSON.stringify(dists));
     this.notify();
   }
 
@@ -458,7 +500,7 @@ class StorageService {
   // --- Weekly Reports (Reportes Semanales Históricos Inmutables) ---
   public getWeeklyReports(): WeeklyReport[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.WEEKLY_REPORTS);
+      const data = cloudStore.getItem(STORAGE_KEYS.WEEKLY_REPORTS);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -466,7 +508,7 @@ class StorageService {
   }
 
   public saveWeeklyReports(reports: WeeklyReport[]) {
-    localStorage.setItem(STORAGE_KEYS.WEEKLY_REPORTS, JSON.stringify(reports));
+    cloudStore.setItem(STORAGE_KEYS.WEEKLY_REPORTS, JSON.stringify(reports));
     this.notify();
   }
 
@@ -519,7 +561,7 @@ class StorageService {
   // --- Reconciliations (Conciliación Semanal de Dumps) ---
   public getReconciliations(): ReconciliationResult[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.RECONCILIATIONS);
+      const data = cloudStore.getItem(STORAGE_KEYS.RECONCILIATIONS);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -527,7 +569,7 @@ class StorageService {
   }
 
   public saveReconciliations(recs: ReconciliationResult[]) {
-    localStorage.setItem(STORAGE_KEYS.RECONCILIATIONS, JSON.stringify(recs));
+    cloudStore.setItem(STORAGE_KEYS.RECONCILIATIONS, JSON.stringify(recs));
     this.notify();
   }
 
@@ -547,30 +589,30 @@ class StorageService {
   // --- City Catalog ---
   public getCities(): CityAlias[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.CITY_CATALOG);
-      return data ? JSON.parse(data) : DEFAULT_CITY_CATALOG;
+      const data = cloudStore.getItem(STORAGE_KEYS.CITY_CATALOG);
+      return data ? JSON.parse(data) : [];
     } catch {
-      return DEFAULT_CITY_CATALOG;
+      return [];
     }
   }
 
   public saveCities(cities: CityAlias[]) {
-    localStorage.setItem(STORAGE_KEYS.CITY_CATALOG, JSON.stringify(cities));
+    cloudStore.setItem(STORAGE_KEYS.CITY_CATALOG, JSON.stringify(cities));
     this.notify();
   }
 
   // --- Weekly Goals ---
   public getGoals(): WeeklyGoal[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.WEEKLY_GOALS);
-      return data ? JSON.parse(data) : INITIAL_GOALS;
+      const data = cloudStore.getItem(STORAGE_KEYS.WEEKLY_GOALS);
+      return data ? JSON.parse(data) : [];
     } catch {
-      return INITIAL_GOALS;
+      return [];
     }
   }
 
   public saveGoals(goals: WeeklyGoal[]) {
-    localStorage.setItem(STORAGE_KEYS.WEEKLY_GOALS, JSON.stringify(goals));
+    cloudStore.setItem(STORAGE_KEYS.WEEKLY_GOALS, JSON.stringify(goals));
     this.notify();
   }
 
@@ -588,7 +630,7 @@ class StorageService {
   // --- Settings ---
   public getSettings(): AppSettings {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      const data = cloudStore.getItem(STORAGE_KEYS.SETTINGS);
       return data ? JSON.parse(data) : DEFAULT_SETTINGS;
     } catch {
       return DEFAULT_SETTINGS;
@@ -596,14 +638,14 @@ class StorageService {
   }
 
   public saveSettings(settings: AppSettings) {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    cloudStore.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
     this.notify();
   }
 
   // --- Column Mappings presets ---
   public getMappings(): Record<string, ColumnMapping> {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.COLUMN_MAPPINGS);
+      const data = cloudStore.getItem(STORAGE_KEYS.COLUMN_MAPPINGS);
       return data
         ? JSON.parse(data)
         : {
@@ -630,14 +672,14 @@ class StorageService {
   public saveMapping(sourceKey: string, mapping: ColumnMapping) {
     const mappings = this.getMappings();
     mappings[sourceKey] = mapping;
-    localStorage.setItem(STORAGE_KEYS.COLUMN_MAPPINGS, JSON.stringify(mappings));
+    cloudStore.setItem(STORAGE_KEYS.COLUMN_MAPPINGS, JSON.stringify(mappings));
     this.notify();
   }
 
   // --- Audit Logs ---
   public getAuditLogs(): AuditLog[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
+      const data = cloudStore.getItem(STORAGE_KEYS.AUDIT_LOGS);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -659,11 +701,11 @@ class StorageService {
       entityType: entityType as AuditLog['entityType'],
       entityId,
       details,
-      user,
+      user: this.getUserProfile().email,
     };
     logs.unshift(newLog);
-    if (logs.length > 800) logs.pop();
-    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(logs));
+    cloudStore.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(logs));
+    this.notify();
   }
 
   // --- Export and Import Complete State for Safe Migration & Backup ---
@@ -702,16 +744,31 @@ class StorageService {
       }
 
       const d = parsed.data;
+      // Validate the entire backup before changing any working data.
+      for (const field of ['leads','batches','deliveries','clients','distributions','weeklyReports','reconciliations','cities','goals','auditLogs']) {
+        if (d[field] === undefined) continue;
+        if (!Array.isArray(d[field])) throw new Error('Colección inválida: '+field);
+        const ids = new Set<string>();
+        for (const row of d[field]) {
+          if (!row || typeof row.id !== 'string' || !row.id || ids.has(row.id)) throw new Error('Identificador inválido o duplicado: '+field);
+          ids.add(row.id);
+        }
+      }
+      if (d.mappings) cloudStore.setItem(STORAGE_KEYS.COLUMN_MAPPINGS, JSON.stringify(d.mappings));
       if (Array.isArray(d.leads)) this.saveLeads(d.leads);
-      if (Array.isArray(d.batches)) localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(d.batches));
-      if (Array.isArray(d.deliveries)) localStorage.setItem(STORAGE_KEYS.DELIVERIES, JSON.stringify(d.deliveries));
+      if (Array.isArray(d.batches)) cloudStore.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(d.batches));
+      if (Array.isArray(d.deliveries)) cloudStore.setItem(STORAGE_KEYS.DELIVERIES, JSON.stringify(d.deliveries));
       if (Array.isArray(d.clients)) this.saveClients(d.clients);
       if (Array.isArray(d.distributions)) this.saveDistributions(d.distributions);
       if (Array.isArray(d.weeklyReports)) this.saveWeeklyReports(d.weeklyReports);
       if (Array.isArray(d.reconciliations)) this.saveReconciliations(d.reconciliations);
       if (Array.isArray(d.cities)) this.saveCities(d.cities);
       if (Array.isArray(d.goals)) this.saveGoals(d.goals);
-      if (Array.isArray(d.auditLogs)) localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(d.auditLogs));
+      if (Array.isArray(d.auditLogs)) {
+        const existing = this.getAuditLogs();
+        const ids = new Set(existing.map(row => row.id));
+        cloudStore.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([...existing,...d.auditLogs.filter((row: AuditLog) => !ids.has(row.id))]));
+      }
       if (d.settings) this.saveSettings(d.settings);
 
       const counts = {
@@ -749,8 +806,13 @@ class StorageService {
 
   // --- Clear / Reset ---
   public clearAll() {
-    Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
+    const profile = this.getUserProfile();
+    const logs = this.getAuditLogs();
+    Object.values(STORAGE_KEYS).filter(k => k !== STORAGE_KEYS.AUDIT_LOGS).forEach((k) => cloudStore.removeItem(k));
     this.initDefaults();
+    this.saveUserProfile(profile);
+    cloudStore.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(logs));
+    this.addAuditLog('migration', 'RESET', 'RESTABLECIMIENTO', 'Restablecimiento solicitado por administrador');
     this.notify();
   }
 }

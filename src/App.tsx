@@ -1,3 +1,7 @@
+import { DatabaseAudit } from './components/auth/DatabaseAudit';
+import { useAuth } from './components/auth/AuthGate';
+import { SyncStatus } from './components/auth/SyncStatus';
+import { TeamAccess } from './components/auth/TeamAccess';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -36,6 +40,8 @@ import { parseFileForPreview, extractRecordsFromFile } from './utils/fileParser'
 import { processAndDeduplicateLeads } from './utils/deduplicator';
 
 export default function App() {
+  const { profile, signOut } = useAuth();
+  const [accountError, setAccountError] = useState('');
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
 
   // Core application data state
@@ -218,6 +224,7 @@ export default function App() {
       storageService.saveDelivery(demoDelivery);
     }
 
+    await storageService.flush();
     reloadData();
   };
 
@@ -233,6 +240,7 @@ export default function App() {
         pendingReviewCount={pendingReviewCount}
         acceptedCount={acceptedCount}
         currentUserRole={currentUserRole}
+        allowedRoles={profile.roles}
         onRoleChange={handleRoleChange}
       />
 
@@ -241,14 +249,19 @@ export default function App() {
         <Navbar
           currentTab={currentTab}
           onOpenImport={() => setCurrentTab('import')}
-          onRefresh={reloadData}
+          onRefresh={() => void storageService.refresh().catch(() => setAccountError('No se pudieron actualizar los datos.'))}
           totalLeads={leads.length}
           totalBatches={batches.length}
+          canImport={profile.roles.some(role => role === 'admin' || role === 'distribucion')}
+          email={profile.email}
+          onSignOut={() => void signOut()}
         />
 
+        <SyncStatus />
+        {accountError && <p role="alert" className="p-3 text-rose-300">{accountError}</p>}
         <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
           {/* Quick Welcome Banner when dataset is completely empty */}
-          {leads.length === 0 && (
+          {leads.length === 0 && profile.roles.some(role => role === 'admin' || role === 'distribucion') && (
             <div className="rounded-2xl bg-gradient-to-r from-indigo-950/60 via-slate-900 to-slate-900 border border-indigo-500/30 p-6 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-5 animate-in fade-in">
               <div className="space-y-1.5 max-w-2xl">
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 inline-flex items-center gap-1.5">
@@ -265,7 +278,7 @@ export default function App() {
 
               <div className="flex flex-col sm:flex-row items-center gap-2.5 shrink-0">
                 <button
-                  onClick={handleQuickSeedDemoData}
+                  onClick={() => void handleQuickSeedDemoData().catch(() => setAccountError('No se pudo confirmar el guardado de los datos de demostración.'))}
                   className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2"
                 >
                   <Sparkles className="w-4 h-4" />
@@ -393,13 +406,13 @@ export default function App() {
           )}
 
           {/* Tab 11: SETTINGS, MIGRATION & AUDIT */}
-          {currentTab === 'settings' && (
-            <SettingsView
+          {currentTab === 'settings' && profile.roles.includes('admin') && (
+            <><TeamAccess /><DatabaseAudit /><SettingsView
               cityCatalog={cityCatalog}
               goals={goals}
               onRefresh={reloadData}
               currentUserRole={currentUserRole}
-            />
+            /></>
           )}
         </main>
       </div>
