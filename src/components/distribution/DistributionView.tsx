@@ -1,3 +1,5 @@
+import { useAuth } from '../auth/AuthGate';
+import { canWrite } from '../../services/access';
 import React, { useState, useMemo } from 'react';
 import {
   Send,
@@ -39,6 +41,7 @@ export const DistributionView: React.FC<DistributionViewProps> = ({
   onRefresh,
   currentUserRole,
 }) => {
+  const canEdit = canWrite(useAuth().profile.roles, 'distributions');
   const [searchTerm, setSearchTerm] = useState('');
   const [clientFilter, setClientFilter] = useState('all');
   const [cityFilter, setCityFilter] = useState('all');
@@ -216,6 +219,7 @@ export const DistributionView: React.FC<DistributionViewProps> = ({
           </div>
 
           <button
+            disabled={!canEdit}
             onClick={() => {
               if (activeClients.length > 0) setFormClientId(activeClients[0].id);
               setIsNewModalOpen(true);

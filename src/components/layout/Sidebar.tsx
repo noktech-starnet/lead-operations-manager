@@ -36,6 +36,7 @@ interface SidebarProps {
   pendingReviewCount: number;
   acceptedCount: number;
   currentUserRole: UserRole;
+  allowedRoles: UserRole[];
   onRoleChange: (role: UserRole) => void;
 }
 
@@ -45,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   pendingReviewCount,
   acceptedCount,
   currentUserRole,
+  allowedRoles,
   onRoleChange,
 }) => {
   const navItems = [
@@ -176,9 +178,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onChange={(e) => onRoleChange(e.target.value as UserRole)}
           className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-bold text-slate-200 focus:outline-none focus:border-indigo-500"
         >
-          <option value="admin">Administrador (Todos los módulos)</option>
-          <option value="distribucion">Responsable de Distribución</option>
-          <option value="conciliacion">Responsable de Conciliación</option>
+          {allowedRoles.includes('admin') && <option value="admin">Administrador (Todos los módulos)</option>}
+          {allowedRoles.includes('distribucion') && <option value="distribucion">Responsable de Distribución</option>}
+          {allowedRoles.includes('conciliacion') && <option value="conciliacion">Responsable de Conciliación</option>}
         </select>
       </div>
 
@@ -189,7 +191,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               {group.section}
             </div>
-            {group.items.map((item) => {
+            {group.items.filter(item => (item.id !== 'settings' || allowedRoles.includes('admin')) && (!['import','review','exports'].includes(item.id) || allowedRoles.some(role => role === 'admin' || role === 'distribucion'))).map((item) => {
               const Icon = item.icon;
               const isActive = currentTab === item.id;
               return (

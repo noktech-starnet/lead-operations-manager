@@ -15,6 +15,9 @@ interface NavbarProps {
   onRefresh: () => void;
   totalLeads: number;
   totalBatches: number;
+  canImport: boolean;
+  email: string;
+  onSignOut: () => void;
 }
 
 const TAB_TITLES: Record<NavTab, { title: string; subtitle: string }> = {
@@ -70,6 +73,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onRefresh,
   totalLeads,
   totalBatches,
+  canImport,
+  email,
+  onSignOut,
 }) => {
   const currentInfo = TAB_TITLES[currentTab] || {
     title: 'Lead Operations Manager',
@@ -94,6 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
+<div className="text-xs text-slate-400"><span className="block max-w-40 truncate" title={email}>{email}</span><button onClick={onSignOut} className="text-indigo-300 hover:text-indigo-200 mt-1">Cerrar sesión</button></div>
           {/* Quick Date Display */}
           <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300">
             <Calendar className="w-3.5 h-3.5 text-indigo-400" />
@@ -117,7 +124,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <RefreshCw className="w-4 h-4" />
           </button>
 
-          {currentTab !== 'import' && (
+          {canImport && currentTab !== 'import' && (
             <button
               onClick={onOpenImport}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all hover:shadow-indigo-600/40"

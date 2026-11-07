@@ -90,9 +90,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const auditLogs = storageService.getAuditLogs();
 
   // Save general settings
-  const handleSaveGeneralSettings = (e: React.FormEvent) => {
+  const handleSaveGeneralSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     storageService.saveSettings(settings);
+    try { await storageService.flush(); } catch { return; }
     setIsSavedAlert(true);
     setTimeout(() => setIsSavedAlert(false), 3000);
   };
@@ -191,10 +192,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const content = event.target?.result as string;
       const res = storageService.importAndVerifyDatabaseJson(content, 'Administrador');
       if (res.success) {
+        try { await storageService.flush(); } catch { setMigrationStatus({msg:'No se pudo confirmar el guardado en Supabase.',isError:true}); return; }
         setMigrationStatus({
           msg: res.message,
           counts: res.counts,
@@ -211,13 +213,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   // Clear data
-  const handleResetData = () => {
+  const handleResetData = async () => {
     if (
       confirm(
         '¿Estás seguro de que deseas restablecer todos los leads y lotes? Se conservará el catálogo de ciudades por defecto.'
       )
     ) {
       storageService.clearAll();
+      try { await storageService.flush(); } catch { return; }
       onRefresh();
       alert('Datos restablecidos correctamente.');
     }
@@ -236,6 +239,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {storageService.hasLegacyData() && <div className="p-4 rounded-xl bg-indigo-950 border border-indigo-700 text-xs space-y-2"><p>Hay datos del prototipo guardados en este navegador. Puedes importarlos explícitamente al equipo. Primero descarga un respaldo; los registros con el mismo identificador se reemplazan.</p><button className="px-3 py-2 bg-indigo-600 rounded-lg font-bold" onClick={async()=>{if(!confirm('¿Importar los datos de este navegador al equipo? Se reemplazarán los registros con el mismo identificador.'))return;try{await storageService.importLegacyData();onRefresh();setMigrationStatus({msg:'Datos del navegador guardados en Supabase.'});}catch{setMigrationStatus({msg:'No se pudo confirmar la importación.',isError:true});}}}>Importar datos de este navegador</button></div>}
+
       {/* Settings Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs">
         <button
@@ -283,7 +288,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           }`}
         >
           <Database className="w-4 h-4 text-emerald-400" />
-          <span>Respaldo y Migración Firestore</span>
+          <span>Respaldo y Migración Supabase</span>
         </button>
 
         <button
@@ -457,7 +462,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* TAB: MIGRATION & FIREBASE PERSISTENCE */}
+      {/* TAB: MIGRATION & SUPABASE PERSISTENCE */}
       {activeTab === 'migration' && (
         <div className="space-y-6">
           <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-xl space-y-4">
@@ -465,7 +470,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div>
                 <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                   <Database className="w-5 h-5 text-emerald-400" />
-                  <span>Protocolo de Respaldo y Migración Controlada a Firestore</span>
+                  <span>Protocolo de Respaldo y Migración Controlada a Supabase</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                   Para cumplir con el requisito obligatorio de conservación permanente del histórico, el aplicativo cuenta con un motor de respaldo completo e importación verificable.
@@ -511,7 +516,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </div>
                 </div>
                 <p className="text-xs text-slate-400">
-                  Genera una copia íntegra con marca de tiempo y versión de esquema lista para almacenar fuera del navegador o migrar a Firestore.
+                  Genera una copia íntegra con marca de tiempo y versión de esquema lista para almacenar fuera del navegador o migrar a Supabase.
                 </p>
                 <button
                   onClick={handleExportBackup}

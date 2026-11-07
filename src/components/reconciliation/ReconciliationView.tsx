@@ -1,3 +1,5 @@
+import { useAuth } from '../auth/AuthGate';
+import { canWrite } from '../../services/access';
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import {
@@ -42,6 +44,7 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
   onRefresh,
   currentUserRole,
 }) => {
+  const canEdit = canWrite(useAuth().profile.roles, 'reconciliations');
   const [activeTab, setActiveTab] = useState<'nueva' | 'historico'>('nueva');
 
   // Step 1: Selection of deliveries
@@ -430,6 +433,7 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
       };
 
       storageService.addReconciliation(recResult);
+      await storageService.flush();
       setActiveResult(recResult);
       onRefresh();
     } catch (err) {
@@ -853,7 +857,7 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
                 <div className="flex items-end">
                   <button
                     onClick={handleExecuteReconciliation}
-                    disabled={isProcessing || !phoneCol || selectedDeliveryIds.length === 0}
+                    disabled={!canEdit || isProcessing || !phoneCol || selectedDeliveryIds.length === 0}
                     className="w-full py-2 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-1.5"
                   >
                     {isProcessing ? (
