@@ -80,3 +80,26 @@ test('role selector includes only assigned roles',async({page})=>{
  await mockBackend(page,{roles:['conciliacion']});await page.goto('/');await login(page);
  await expect(page.locator('aside select option')).toHaveText(['Responsable de Conciliación']);await expect(page.getByRole('button',{name:'Configuración & Histórico',exact:true})).toHaveCount(0);
 });
+test('add a city from cleaning center, persist it, and reject duplicates',async({page})=>{
+ const backend=await mockBackend(page);await page.goto('/');await login(page);
+ await page.getByRole('button',{name:'Centro de depuración',exact:true}).click();
+ await page.getByRole('button',{name:'Agregar ciudad',exact:true}).click();
+ await page.getByLabel('Nombre de la ciudad *',{exact:true}).fill('Mazatlán');
+ await page.getByLabel('Estado',{exact:true}).fill('Sinaloa');
+ await page.getByLabel('Alias de adset (separados por comas)',{exact:true}).fill('MZT');
+ await page.getByRole('button',{name:'Guardar ciudad',exact:true}).click();
+ await expect.poll(()=>[...backend.records.values()].some(row=>row.data.canonicalCity==='Mazatlán'&&row.data.aliases.includes('MZT'))).toBe(true);
+ await page.reload();await expect(page.getByRole('heading',{name:'Dashboard Ejecutivo y Ciclo de Leads'})).toBeVisible();
+ await page.getByRole('button',{name:'Centro de depuración',exact:true}).click();
+ await expect(page.locator('option[value="Mazatlán"]')).toHaveCount(1);
+ await page.getByRole('button',{name:'Agregar ciudad',exact:true}).click();
+ await page.getByLabel('Nombre de la ciudad *',{exact:true}).fill(' mazatlan ');
+ await page.getByRole('button',{name:'Guardar ciudad',exact:true}).click();
+ await expect(page.getByRole('alert')).toContainText('ya existe');
+ expect([...backend.records.values()].filter(row=>row.data.canonicalCity==='Mazatlán')).toHaveLength(1);
+});
+test('distribution role cannot add catalog cities',async({page})=>{
+ await mockBackend(page,{roles:['distribucion']});await page.goto('/');await login(page);
+ await page.getByRole('button',{name:'Centro de depuración',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Agregar ciudad',exact:true})).toHaveCount(0);
+});

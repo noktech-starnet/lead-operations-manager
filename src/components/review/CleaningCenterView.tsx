@@ -18,6 +18,7 @@ import {
   Layers,
   FileText,
   Calendar,
+  Plus,
 } from 'lucide-react';
 import { Lead, LeadStatus, ReviewReason, CityAlias } from '../../types';
 import { StatusBadge, ReasonBadge } from '../common/Badge';
@@ -31,13 +32,52 @@ interface CleaningCenterViewProps {
   leads: Lead[];
   cityCatalog: CityAlias[];
   onRefresh: () => void;
+  canManageCities: boolean;
 }
 
 export const CleaningCenterView: React.FC<CleaningCenterViewProps> = ({
   leads,
   cityCatalog,
   onRefresh,
+  canManageCities,
 }) => {
+  const [isAddingCity, setIsAddingCity] = useState(false);
+  const [cityForm, setCityForm] = useState({ name: '', state: '', aliases: '' });
+  const [cityError, setCityError] = useState('');
+  const openAddCity = () => {
+    setCityForm({ name: '', state: '', aliases: '' });
+    setCityError('');
+    setIsAddingCity(true);
+  };
+  const handleAddCity = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canManageCities) return;
+    const name = cityForm.name.trim().replace(/\s+/g, ' ');
+    const key = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('es');
+    const catalog = storageService.getCities();
+    if (!name) {
+      setCityError('Escribe el nombre de la ciudad.');
+      return;
+    }
+    if (catalog.some(city => key(city.canonicalCity) === key(name))) {
+      setCityError('Esta ciudad ya existe en el catálogo. Puedes seleccionarla al editar el lead.');
+      return;
+    }
+    const aliases = Array.from(new Set([name, ...cityForm.aliases.split(',')]
+      .map(alias => alias.trim().toUpperCase()).filter(Boolean)));
+    try {
+      storageService.saveCities([...catalog, {
+        id: `city-${crypto.randomUUID()}`, canonicalCity: name,
+        state: cityForm.state.trim(), aliases, isActive: true,
+      }]);
+      if (editingLead) setEditForm(previous => ({ ...previous, ciudad: name }));
+      setIsAddingCity(false);
+      onRefresh();
+    } catch (error) {
+      setCityError(error instanceof Error ? error.message : 'No se pudo guardar la ciudad.');
+    }
+  };
+
   // Filters state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -85,12 +125,12 @@ export const CleaningCenterView: React.FC<CleaningCenterViewProps> = ({
   }, [leads]);
 
   const uniqueCities = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(cityCatalog.map(city => city.canonicalCity));
     leads.forEach((l) => {
       if (l.ciudad) set.add(l.ciudad);
     });
     return Array.from(set).sort();
-  }, [leads]);
+  }, [leads, cityCatalog]);
 
   // Filtered Leads
   const filteredLeads = useMemo(() => {
@@ -242,6 +282,13 @@ export const CleaningCenterView: React.FC<CleaningCenterViewProps> = ({
 
   return (
     <div className="space-y-5">
+      {canManageCities && (
+        <div className="flex justify-end">
+          <button type="button" onClick={openAddCity} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-bold">
+            <Plus className="w-4 h-4" /> Agregar ciudad
+          </button>
+        </div>
+      )}
       {/* Search and Filters Bar */}
       <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -644,7 +691,7 @@ export const CleaningCenterView: React.FC<CleaningCenterViewProps> = ({
       </div>
 
       {/* Edit Lead Modal */}
-      {editingLead && (
+      {editingLead && !isAddingCity && (
         <Modal
           isOpen={Boolean(editingLead)}
           onClose={() => setEditingLead(null)}
@@ -694,6 +741,11 @@ export const CleaningCenterView: React.FC<CleaningCenterViewProps> = ({
                   </option>
                 ))}
               </select>
+              {canManageCities && (
+                <button type="button" onClick={openAddCity} className="mt-2 text-xs font-semibold text-indigo-400 hover:text-indigo-300">
+                  + Agregar ciudad al catálogo
+                </button>
+              )}
             </div>
 
             <div>
@@ -767,6 +819,31 @@ export const CleaningCenterView: React.FC<CleaningCenterViewProps> = ({
               </button>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {isAddingCity && (
+        <Modal isOpen onClose={() => setIsAddingCity(false)} title="Agregar nueva ciudad" subtitle="Estará disponible en el catálogo y al editar leads." maxWidth="lg">
+          <form onSubmit={handleAddCity} className="space-y-4">
+            <div>
+              <label htmlFor="new-city-name" className="block text-xs text-slate-300 mb-1">Nombre de la ciudad *</label>
+              <input id="new-city-name" autoFocus required value={cityForm.name} onChange={event => setCityForm({ ...cityForm, name: event.target.value })} className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm" placeholder="Ej: Aguascalientes" />
+            </div>
+            <div>
+              <label htmlFor="new-city-state" className="block text-xs text-slate-300 mb-1">Estado</label>
+              <input id="new-city-state" value={cityForm.state} onChange={event => setCityForm({ ...cityForm, state: event.target.value })} className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm" placeholder="Ej: Aguascalientes" />
+            </div>
+            <div>
+              <label htmlFor="new-city-aliases" className="block text-xs text-slate-300 mb-1">Alias de adset (separados por comas)</label>
+              <input id="new-city-aliases" value={cityForm.aliases} onChange={event => setCityForm({ ...cityForm, aliases: event.target.value })} className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm" placeholder="Ej: AGS, AGUASCALIENTES" />
+              <p className="text-xs text-slate-400 mt-1">El nombre de la ciudad se incluye como alias automáticamente para futuras importaciones.</p>
+            </div>
+            {cityError && <p role="alert" className="text-sm text-rose-400">{cityError}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setIsAddingCity(false)} className="px-4 py-2 rounded-lg bg-slate-800 text-xs">Cancelar</button>
+              <button type="submit" className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">Guardar ciudad</button>
+            </div>
+          </form>
         </Modal>
       )}
 

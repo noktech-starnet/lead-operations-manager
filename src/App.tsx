@@ -370,6 +370,7 @@ export default function App() {
           {/* Tab 7: CLEANING CENTER */}
           {currentTab === 'review' && (
             <CleaningCenterView
+              canManageCities={profile.roles.includes('admin')}
               leads={leads}
               cityCatalog={cityCatalog}
               onRefresh={reloadData}
